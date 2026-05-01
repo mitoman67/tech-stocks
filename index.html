@@ -8,12 +8,12 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { font-family: system-ui, sans-serif; background: #0a0a0a; color: white; }
-    .price { font-size: 2.1rem; font-weight: 700; }
-    .card { background: #18181b; border-radius: 16px; }
-    canvas { max-height: 160px; }
+    .price { font-size: 2.2rem; font-weight: 700; }
+    .card { background: #18181b; border-radius: 18px; }
+    canvas { max-height: 155px; }
   </style>
 </head>
-<body class="p-3 max-w-5xl mx-auto">
+<body class="p-3 max-w-6xl mx-auto">
 
   <div class="text-center mb-6">
     <h1 class="text-3xl font-bold">Tech Stocks Live</h1>
@@ -23,10 +23,12 @@
   <div id="container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
 
   <p class="text-center text-xs text-zinc-500 mt-10">
-    Osvežuje se vsakih 45 sekund • Vir: Yahoo Finance
+    Osvežuje se vsakih 45 sekund
   </p>
 
   <script>
+    let stockHistory = {}; // tu shranjujemo podatke za grafe
+
     const symbols = ["NVDA", "AAPL", "MSFT", "META", "AMZN", "TSLA", "AMD"];
 
     async function getStockData(symbol) {
@@ -41,11 +43,17 @@
         const closes = result.indicators.quote[0].close;
 
         const price = meta.regularMarketPrice || meta.previousClose;
-        const change = price - meta.previousClose;
-        const changePct = (change / meta.previousClose) * 100;
+        const changePct = ((price - meta.previousClose) / meta.previousClose) * 100;
 
-        const labels = timestamps.slice(-30).map(ts => new Date(ts * 1000).toLocaleTimeString('sl-SI', {hour:'2-digit', minute:'2-digit'}));
-        const prices = closes.slice(-30);
+        // Shranimo za graf
+        if (!stockHistory[symbol]) stockHistory[symbol] = {labels: [], prices: []};
+        const history = stockHistory[symbol];
+        history.labels.push(new Date().toLocaleTimeString('sl-SI', {hour:'2-digit', minute:'2-digit'}));
+        history.prices.push(price);
+        if (history.labels.length > 40) {
+          history.labels.shift();
+          history.prices.shift();
+        }
 
         return {
           symbol,
@@ -53,8 +61,8 @@
           changePct: changePct.toFixed(2),
           high: meta.regularMarketDayHigh ? meta.regularMarketDayHigh.toFixed(2) : "—",
           low: meta.regularMarketDayLow ? meta.regularMarketDayLow.toFixed(2) : "—",
-          labels,
-          prices
+          labels: history.labels,
+          prices: history.prices
         };
       } catch (e) {
         return null;
@@ -69,9 +77,36 @@
       return {color: "bg-zinc-600", text: "Nevtralno"};
     }
 
+    function createChart(canvasId, labels, prices) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{ 
+            data: prices, 
+            borderColor: '#22c55e', 
+            borderWidth: 2.5, 
+            tension: 0.35,
+            pointRadius: 0 
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: '#27272a' }, ticks: { color: '#888', font: {size: 10} } },
+            x: { grid: { color: '#27272a' }, ticks: { color: '#888', maxTicksLimit: 6, font: {size: 10} } }
+          }
+        }
+      });
+    }
+
     async function updateAll() {
       const container = document.getElementById('container');
-      container.innerHTML = `<p class="text-center py-10 col-span-full text-zinc-400">Nalagam podatke in grafe...</p>`;
+      container.innerHTML = `<p class="text-center py-10 col-span-full text-zinc-400">Nalagam podatke...</p>`;
 
       let html = '';
       for (let sym of symbols) {
@@ -81,13 +116,15 @@
         const signal = getSignal(data.changePct);
         const isPositive = parseFloat(data.changePct) >= 0;
 
+        const canvasId = `chart-${sym}`;
+
         html += `
           <div class="card p-4">
             <div class="flex justify-between items-center mb-3">
               <div class="font-bold text-xl">${sym}</div>
               <div class="text-right">
                 <div class="price">${data.price}</div>
-                <div class="${isPositive ? 'text-emerald-400' : 'text-red-400'} text-sm font-medium">
+                <div class="${isPositive ? 'text-emerald-400' : 'text-red-400'} text-sm">
                   ${isPositive ? '+' : ''}${data.changePct}%
                 </div>
               </div>
@@ -98,9 +135,11 @@
               <div>Low: <span class="text-white">${data.low}</span></div>
             </div>
 
-            <canvas id="chart-${sym}" class="mb-3"></canvas>
+            <div style="height: 155px;">
+              <canvas id="${canvasId}"></canvas>
+            </div>
 
-            <div class="${signal.color} text-white text-center py-2.5 rounded-xl text-sm font-medium">
+            <div class="${signal.color} text-white text-center py-2.5 rounded-xl text-sm font-medium mt-3">
               ${signal.text}
             </div>
           </div>`;
@@ -111,10 +150,12 @@
       // Ustvari grafe
       setTimeout(() => {
         symbols.forEach(sym => {
-          const data = /* tu bi moral shraniti data, ampak zaenkrat preskočimo ponovno klicev */
-          // Za poenostavitev bomo grafe naredili kasneje ali uporabili drug način
+          const data = stockHistory[sym];
+          if (data && data.labels.length > 1) {
+            createChart(`chart-${sym}`, data.labels, data.prices);
+          }
         });
-      }, 300);
+      }, 400);
 
       document.getElementById('last-update').textContent = `Zadnja osvežitev: ${new Date().toLocaleTimeString('sl-SI')}`;
     }
