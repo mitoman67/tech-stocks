@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: system-ui, sans-serif; background: #0a0a0a; color: white; }
-    .price { font-size: 2.6rem; font-weight: 700; }
+    .price { font-size: 2.7rem; font-weight: 700; }
     .card { background: #18181b; border-radius: 20px; }
   </style>
 </head>
@@ -15,13 +15,13 @@
 
   <div class="text-center mb-6">
     <h1 class="text-3xl font-bold">Tech Stocks Live</h1>
-    <p class="text-zinc-400 text-sm">Intraday pregled • Osvežuje se vsakih 25 sekund</p>
+    <p class="text-zinc-400 text-sm">Osvežuje se vsakih 45 sekund</p>
   </div>
 
   <div id="container" class="space-y-5"></div>
 
   <p class="text-center text-xs text-zinc-500 mt-10">
-    Vir: Yahoo Finance (preko proxy) • Ni finančni nasvet
+    Vir: Yahoo Finance (proxy) • Ni finančni nasvet
   </p>
 
   <script>
@@ -29,65 +29,52 @@
 
     async function getStock(symbol) {
       try {
-        // Bolj stabilen proxy + chart endpoint
         const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`)}`;
-        
         const res = await fetch(url);
         const data = await res.json();
         const json = JSON.parse(data.contents);
-
         const result = json.chart.result[0];
         const meta = result.meta;
-        const quote = result.quotes ? result.quotes[result.quotes.length-1] : null;
 
         const price = meta.regularMarketPrice || meta.previousClose;
-        const previousClose = meta.previousClose;
-        const change = price - previousClose;
-        const changePct = (change / previousClose) * 100;
+        const change = price - meta.previousClose;
+        const changePct = (change / meta.previousClose) * 100;
 
         return {
           symbol,
           price: price.toFixed(2),
-          change: change.toFixed(2),
           changePct: changePct.toFixed(2),
-          dayHigh: meta.regularMarketDayHigh ? meta.regularMarketDayHigh.toFixed(2) : "—",
-          dayLow: meta.regularMarketDayLow ? meta.regularMarketDayLow.toFixed(2) : "—"
+          dayHigh: meta.regularMarketDayHigh?.toFixed(2) || "—",
+          dayLow: meta.regularMarketDayLow?.toFixed(2) || "—"
         };
       } catch (e) {
-        console.log("Napaka pri " + symbol, e);
         return null;
       }
     }
 
-    function getSignal(changePct) {
-      const pct = parseFloat(changePct);
-      if (pct <= -1.8) return {score: 5, color: "bg-emerald-600", text: "MOČAN PADEC – Zelo dobra priložnost"};
-      if (pct <= -1.0) return {score: 4, color: "bg-emerald-500", text: "Dober padec – vstop"};
-      if (pct <= -0.4) return {score: 3, color: "bg-amber-500", text: "Majhen padec"};
-      return {score: 2, color: "bg-zinc-600", text: "Nevtralno / previsoko"};
+    function getSignal(pct) {
+      const change = parseFloat(pct);
+      if (change <= -1.7) return {score: 5, color: "bg-emerald-600", text: "MOČAN PADEC – Odlična priložnost"};
+      if (change <= -0.9) return {score: 4, color: "bg-emerald-500", text: "Dober padec – vstop"};
+      if (change <= -0.4) return {score: 3, color: "bg-amber-500", text: "Majhen padec"};
+      return {score: 2, color: "bg-zinc-600", text: "Nevtralno"};
     }
 
     async function updateAll() {
       const container = document.getElementById('container');
-      container.innerHTML = `<p class="text-center py-10 text-zinc-400">Nalagam aktualne cene...</p>`;
+      container.innerHTML = `<p class="text-center py-8 text-zinc-400">Nalagam cene...</p>`;
 
       let html = '';
-
       for (let sym of symbols) {
         const data = await getStock(sym);
-        if (!data) {
-          html += `<div class="card p-5"><p class="text-red-400">Napaka pri ${sym}</p></div>`;
-          continue;
-        }
+        if (!data) continue;
 
         const signal = getSignal(data.changePct);
 
         html += `
           <div class="card p-5">
-            <div class="flex justify-between">
-              <div>
-                <div class="text-2xl font-bold">${sym}</div>
-              </div>
+            <div class="flex justify-between items-start">
+              <div class="font-bold text-2xl">${sym}</div>
               <div class="text-right">
                 <div class="price">${data.price}</div>
                 <div class="${parseFloat(data.changePct) >= 0 ? 'text-emerald-400' : 'text-red-400'}">
@@ -95,7 +82,7 @@
                 </div>
               </div>
             </div>
-            <div class="mt-4 text-sm grid grid-cols-2 gap-4">
+            <div class="mt-4 grid grid-cols-2 text-sm">
               <div>High: <span class="font-medium">${data.dayHigh}</span></div>
               <div>Low: <span class="font-medium">${data.dayLow}</span></div>
             </div>
@@ -104,13 +91,12 @@
             </div>
           </div>`;
       }
-
       container.innerHTML = html;
     }
 
-    // Zaženi
+    // Zaženi in osvežuj vsakih 45 sekund
     updateAll();
-    setInterval(updateAll, 25000);   // vsakih 25 sekund
+    setInterval(updateAll, 45000);
   </script>
 </body>
 </html>
