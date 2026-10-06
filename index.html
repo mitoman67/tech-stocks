@@ -3,165 +3,980 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tech Stocks Live</title>
+  <title>Moj Združen Portfelj Naložb (LJSE & Trading 212)</title>
+  
+  <!-- Chart.js za grafični prikaz sestave portfelja -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tailwind CSS za sodoben in odziven temni dizajn -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
   <style>
-    body { font-family: system-ui, sans-serif; background: #0a0a0a; color: white; }
-    .price { font-size: 2.2rem; font-weight: 700; }
-    .card { background: #18181b; border-radius: 18px; }
-    canvas { max-height: 155px; }
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --input-bg: #0f172a;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    .card-glass {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .custom-input {
+      background-color: var(--input-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .custom-input:focus {
+      border-color: var(--accent-blue);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
+
+    .chart-box {
+      position: relative;
+      height: 320px;
+      width: 100%;
+    }
+
+    .asset-table th {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-t212 {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .badge-ljse {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .modal-backdrop {
+      background-color: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(6px);
+    }
   </style>
 </head>
-<body class="p-3 max-w-6xl mx-auto">
+<body class="p-4 md:p-6 text-slate-100">
 
-  <div class="text-center mb-6">
-    <h1 class="text-3xl font-bold">Tech Stocks Live</h1>
-    <p id="last-update" class="text-zinc-400 text-sm"></p>
+<div class="max-w-7xl mx-auto space-y-6">
+
+  <!-- GLAVNA GLAVA Z INFORMACIJAMI O OSVEŽEVANJU -->
+  <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-800">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
+        <span class="text-3xl">📈</span> Moj Združen Portfelj
+      </h1>
+      <p class="text-xs text-slate-400 mt-1">
+        Spremljanje naložb v realnem času: Trading 212 ETF-ji & NLB Trading (Ljubljanska borza - LJSE)
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2 text-xs flex items-center gap-3 shadow-sm">
+        <span class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+        </span>
+        <div>
+          <div id="update-timer" class="font-medium text-slate-200">Zadnja osvežitev: Preračunavam...</div>
+          <div id="next-refresh-timer" class="text-slate-400 text-[10px]">Naslednje osveževanje: 15:00</div>
+        </div>
+      </div>
+
+      <button onclick="renderAll(true)" class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition duration-150 shadow-md">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Osveži zdaj
+      </button>
+    </div>
+  </header>
+
+  <!-- KARTICE POVZETKA PORTFELJA -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    
+    <!-- Skupna vrednost -->
+    <div class="card-glass p-5 flex flex-col justify-between">
+      <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex justify-between items-center">
+        <span>Skupna Vrednost Portfelja</span>
+        <span class="text-emerald-400 bg-emerald-950/60 border border-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">Skupaj</span>
+      </div>
+      <div class="text-3xl font-black text-emerald-400 my-3" id="metric-total">0,00 €</div>
+      <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden flex">
+        <div id="bar-t212" class="bg-blue-500 h-full transition-all duration-500" style="width: 50%"></div>
+        <div id="bar-ljse" class="bg-amber-500 h-full transition-all duration-500" style="width: 50%"></div>
+      </div>
+    </div>
+
+    <!-- Trading 212 -->
+    <div class="card-glass p-5 flex flex-col justify-between">
+      <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex justify-between items-center">
+        <span>Trading 212 (VWCE, SXR8, SGLN ...)</span>
+        <span id="t212-mode-badge" class="text-blue-400 bg-blue-950/60 border border-blue-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">ROČNO / API</span>
+      </div>
+      <div class="text-3xl font-black text-blue-400 my-3" id="metric-t212">0,00 €</div>
+      <div class="text-xs text-slate-400 flex justify-between font-medium">
+        <span id="metric-t212-share">Delež: 0.0%</span>
+        <span id="metric-t212-count">0 pozicij</span>
+      </div>
+    </div>
+
+    <!-- NLB / LJSE -->
+    <div class="card-glass p-5 flex flex-col justify-between">
+      <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex justify-between items-center">
+        <span>NLB Trading / LJSE & Obveznice</span>
+        <span class="text-amber-400 bg-amber-950/60 border border-amber-800 text-[10px] px-2 py-0.5 rounded-full font-semibold">Slovenija</span>
+      </div>
+      <div class="text-3xl font-black text-amber-400 my-3" id="metric-nlb">0,00 €</div>
+      <div class="text-xs text-slate-400 flex justify-between font-medium">
+        <span id="metric-ljse-share">Delež: 0.0%</span>
+        <span>7 lokalnih naložb</span>
+      </div>
+    </div>
+
   </div>
 
-  <div id="container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+  <!-- GLAVNI MREŽNI PRIKAZ -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-  <p class="text-center text-xs text-zinc-500 mt-10">
-    Osvežuje se vsakih 45 sekund
-  </p>
+    <!-- STRANSKI MENI (5 STOLPCEV) -->
+    <div class="lg:col-span-5 space-y-6">
 
-  <script>
-    let stockHistory = {}; // tu shranjujemo podatke za grafe
+      <!-- KARTICA 1: TRADING 212 ETF-JI & API NASTAVITVE -->
+      <div class="card-glass p-5 space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-700">
+          <div>
+            <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <span>🌍</span> Trading 212 Naložbe
+            </h2>
+            <p class="text-[11px] text-slate-400 mt-0.5">Avtomatska sinhronizacija ali ročni vnos</p>
+          </div>
+          <button onclick="openWeeklyBuyModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition active:scale-95 flex items-center gap-1 shadow">
+            <span>➕</span> Tedenski Nakup
+          </button>
+        </div>
 
-    const symbols = ["NVDA", "AAPL", "MSFT", "META", "AMZN", "TSLA", "AMD"];
+        <!-- ETF TABELA ROČNIH VNOSOV -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse asset-table">
+            <thead>
+              <tr class="border-b border-slate-700">
+                <th class="py-2 text-[11px]">ETF / Ticker</th>
+                <th class="py-2 text-[11px] text-right w-20">Kosi</th>
+                <th class="py-2 text-[11px] text-right w-24">Cena €</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-xs">
+              <!-- VWCE -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">
+                  <div class="font-bold text-blue-400">VWCE</div>
+                  <div class="text-[10px] text-slate-400">Vanguard All-World</div>
+                </td>
+                <td><input type="number" step="0.0001" id="qty-vwce" value="120" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.01" id="price-vwce" value="124.50" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+              </tr>
+              <!-- SXR8 -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">
+                  <div class="font-bold text-blue-400">SXR8</div>
+                  <div class="text-[10px] text-slate-400">iShares S&P 500</div>
+                </td>
+                <td><input type="number" step="0.0001" id="qty-sxr8" value="25" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.01" id="price-sxr8" value="512.30" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+              </tr>
+              <!-- SGLN -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">
+                  <div class="font-bold text-blue-400">SGLN</div>
+                  <div class="text-[10px] text-slate-400">iShares Physical Gold</div>
+                </td>
+                <td><input type="number" step="0.0001" id="qty-sgln" value="150" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.01" id="price-sgln" value="42.80" oninput="handleEtfInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-    async function getStockData(symbol) {
-      try {
-        const url = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d`)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const json = JSON.parse(data.contents);
-        const result = json.chart.result[0];
-        const meta = result.meta;
-        const timestamps = result.timestamp;
-        const closes = result.indicators.quote[0].close;
+        <!-- RAZŠIRLJIV MENI ZA CLOUDFLARE IN API POVEZAVO -->
+        <details class="bg-slate-900/80 rounded-xl p-3 border border-slate-800 text-xs" id="api-details-panel">
+          <summary class="font-semibold text-slate-300 cursor-pointer flex items-center justify-between select-none">
+            <span class="flex items-center gap-1.5">⚡ Samodejna API Sinhronizacija</span>
+            <span class="text-[10px] text-blue-400 underline">Uredi povezavo</span>
+          </summary>
+          
+          <div class="mt-3 space-y-3 pt-2 border-t border-slate-800">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400 text-[11px] font-medium">Omogoči API način:</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="api-mode-toggle" onchange="toggleApiMode()" class="sr-only peer">
+                <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
 
-        const price = meta.regularMarketPrice || meta.previousClose;
-        const changePct = ((price - meta.previousClose) / meta.previousClose) * 100;
-
-        // Shranimo za graf
-        if (!stockHistory[symbol]) stockHistory[symbol] = {labels: [], prices: []};
-        const history = stockHistory[symbol];
-        history.labels.push(new Date().toLocaleTimeString('sl-SI', {hour:'2-digit', minute:'2-digit'}));
-        history.prices.push(price);
-        if (history.labels.length > 40) {
-          history.labels.shift();
-          history.prices.shift();
-        }
-
-        return {
-          symbol,
-          price: price.toFixed(2),
-          changePct: changePct.toFixed(2),
-          high: meta.regularMarketDayHigh ? meta.regularMarketDayHigh.toFixed(2) : "—",
-          low: meta.regularMarketDayLow ? meta.regularMarketDayLow.toFixed(2) : "—",
-          labels: history.labels,
-          prices: history.prices
-        };
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function getSignal(pct) {
-      const change = parseFloat(pct);
-      if (change <= -1.7) return {color: "bg-emerald-600", text: "MOČAN PAD - Kupi"};
-      if (change <= -0.9) return {color: "bg-emerald-500", text: "Dober padec"};
-      if (change <= -0.4) return {color: "bg-amber-500", text: "Majhen padec"};
-      return {color: "bg-zinc-600", text: "Nevtralno"};
-    }
-
-    function createChart(canvasId, labels, prices) {
-      const ctx = document.getElementById(canvasId);
-      if (!ctx) return;
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{ 
-            data: prices, 
-            borderColor: '#22c55e', 
-            borderWidth: 2.5, 
-            tension: 0.35,
-            pointRadius: 0 
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { grid: { color: '#27272a' }, ticks: { color: '#888', font: {size: 10} } },
-            x: { grid: { color: '#27272a' }, ticks: { color: '#888', maxTicksLimit: 6, font: {size: 10} } }
-          }
-        }
-      });
-    }
-
-    async function updateAll() {
-      const container = document.getElementById('container');
-      container.innerHTML = `<p class="text-center py-10 col-span-full text-zinc-400">Nalagam podatke...</p>`;
-
-      let html = '';
-      for (let sym of symbols) {
-        const data = await getStockData(sym);
-        if (!data) continue;
-
-        const signal = getSignal(data.changePct);
-        const isPositive = parseFloat(data.changePct) >= 0;
-
-        const canvasId = `chart-${sym}`;
-
-        html += `
-          <div class="card p-4">
-            <div class="flex justify-between items-center mb-3">
-              <div class="font-bold text-xl">${sym}</div>
-              <div class="text-right">
-                <div class="price">${data.price}</div>
-                <div class="${isPositive ? 'text-emerald-400' : 'text-red-400'} text-sm">
-                  ${isPositive ? '+' : ''}${data.changePct}%
-                </div>
+            <div id="t212-credentials-form" class="space-y-2 opacity-50 pointer-events-none transition-opacity">
+              <div>
+                <label class="block text-[11px] font-medium text-slate-400 mb-0.5" for="proxy-url">Cloudflare Worker Proxy URL:</label>
+                <input type="text" id="proxy-url" placeholder="https://t212-proxy.vasedrugoime.workers.dev/?url=" class="w-full custom-input px-2.5 py-1.5 rounded-lg text-xs" />
               </div>
+
+              <div>
+                <label class="block text-[11px] font-medium text-slate-400 mb-0.5" for="api-key">Trading 212 API Ključ (Live):</label>
+                <input type="password" id="api-key" placeholder="Prilepite API ključ" class="w-full custom-input px-2.5 py-1.5 rounded-lg text-xs" />
+              </div>
+
+              <button onclick="saveAndRefresh()" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium py-2 px-3 rounded-lg text-xs transition duration-150 shadow">
+                Shrani in Sinhroniziraj API
+              </button>
             </div>
 
-            <div class="text-xs text-zinc-400 flex justify-between mb-3">
-              <div>High: <span class="text-white">${data.high}</span></div>
-              <div>Low: <span class="text-white">${data.low}</span></div>
+            <!-- DIAGNOSTIČNI STATUS -->
+            <div id="t212-status" class="p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400">
+              Način: Ročni vnos količin in cen
             </div>
+          </div>
+        </details>
+      </div>
 
-            <div style="height: 155px;">
-              <canvas id="${canvasId}"></canvas>
-            </div>
+      <!-- KARTICA 2: SLOVENSKI PORTFELJ (LJSE Z TOČNIMI CENAMI) -->
+      <div class="card-glass p-5 space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-700">
+          <div>
+            <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <span>🇸🇮</span> Slovenski Portfelj (LJSE & Obveznice)
+            </h2>
+            <p class="text-[11px] text-slate-400 mt-0.5">Lokalne delnice in narodne obveznice RS</p>
+          </div>
+        </div>
 
-            <div class="${signal.color} text-white text-center py-2.5 rounded-xl text-sm font-medium mt-3">
-              ${signal.text}
-            </div>
-          </div>`;
-      }
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse asset-table">
+            <thead>
+              <tr class="border-b border-slate-700">
+                <th class="py-2 text-[11px]">Naložba</th>
+                <th class="py-2 text-[11px] text-right w-20">Kosi</th>
+                <th class="py-2 text-[11px] text-right w-24">Cena €</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-xs">
+              
+              <!-- Krka -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Krka (KRKG)</td>
+                <td><input type="number" id="qty-krkg" value="45" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.1" id="price-krkg" value="258.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
 
-      container.innerHTML = html;
+              <!-- Petrol -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Petrol (PETG)</td>
+                <td><input type="number" id="qty-petg" value="247" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.1" id="price-petg" value="60.80" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
 
-      // Ustvari grafe
-      setTimeout(() => {
-        symbols.forEach(sym => {
-          const data = stockHistory[sym];
-          if (data && data.labels.length > 1) {
-            createChart(`chart-${sym}`, data.labels, data.prices);
-          }
+              <!-- NLB -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">NLB (NLBR)</td>
+                <td><input type="number" id="qty-nlbr" value="28" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.1" id="price-nlbr" value="228.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
+
+              <!-- Luka Koper -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Luka Koper (LKPG)</td>
+                <td><input type="number" id="qty-lkpg" value="20" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.1" id="price-lkpg" value="118.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
+
+              <!-- Zavarovalnica Triglav -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Triglav (ZVTG)</td>
+                <td><input type="number" id="qty-zvtg" value="209" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="0.1" id="price-zvtg" value="67.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
+
+              <!-- Obveznica RS96 -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Obveznica RS96</td>
+                <td><input type="number" id="qty-rs96" value="12" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="1" id="price-rs96" value="1000.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
+
+              <!-- Obveznica RS99 -->
+              <tr>
+                <td class="py-2 font-medium text-slate-200">Obveznica RS99</td>
+                <td><input type="number" id="qty-rs99" value="13" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs" /></td>
+                <td><input type="number" step="1" id="price-rs99" value="1000.00" oninput="handleLocalInputChange()" class="w-full custom-input px-2 py-1 rounded text-right text-xs font-semibold text-amber-400" /></td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pt-2">
+          <button onclick="resetToAccurateDefaults()" class="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 py-2 px-3 rounded-lg text-xs font-medium transition duration-150 flex items-center justify-center gap-2">
+            <span>🔄</span> Ponastavi na privzete cene in količine
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- GLAVNI PRIKAZ (7 STOLPCEV) -->
+    <div class="lg:col-span-7 space-y-6">
+
+      <!-- KROŽNI DIAGRAM SESTAVE PORTFELJA -->
+      <div class="card-glass p-5">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-700">
+          <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <span>📊</span> Sestava Portfelja (Krožni Diagram)
+          </h2>
+          <div class="text-xs text-slate-400 font-semibold" id="chart-total-label">Preračunavanje...</div>
+        </div>
+
+        <div class="chart-box">
+          <canvas id="portfolioChart"></canvas>
+        </div>
+      </div>
+
+      <!-- DETAJLNA TABELA VSEH POZICIJ -->
+      <div class="card-glass p-5">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-slate-700">
+          <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <span>📋</span> Podrobna Tabela Pozicij
+          </h2>
+          <div class="w-full sm:w-56">
+            <input type="text" id="table-search" oninput="filterPositionsTable()" placeholder="🔍 Isči naložbo ali vir..." class="w-full custom-input px-3 py-1.5 rounded-lg text-xs" />
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 text-[11px] uppercase tracking-wider">
+                <th class="py-2.5 px-3">Naložba</th>
+                <th class="py-2.5 px-3">Vir</th>
+                <th class="py-2.5 px-3 text-right">Količina</th>
+                <th class="py-2.5 px-3 text-right">Cena / Kos</th>
+                <th class="py-2.5 px-3 text-right">Skupna Vrednost</th>
+                <th class="py-2.5 px-3 text-right">Delež</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-table-body" class="divide-y divide-slate-800 text-xs">
+              <!-- Samodejno napolnjeno z JavaScriptom -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- MODALNO OKNO ZA TEDENSKI NAKUP ETF-JEV -->
+<div id="weekly-buy-modal" class="fixed inset-0 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+  <div class="card-glass max-w-md w-full p-6 space-y-4 border border-slate-700 shadow-2xl">
+    <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+      <h3 class="font-bold text-slate-100 flex items-center gap-2 text-base">
+        <span>➕</span> Dodaj Tedenski Nakup ETF-ja
+      </h3>
+      <button onclick="closeWeeklyBuyModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+    </div>
+
+    <div class="space-y-3 text-xs">
+      <div>
+        <label class="block text-slate-400 mb-1 font-medium">Izberi ETF za nakup:</label>
+        <select id="modal-etf-select" class="w-full custom-input px-3 py-2 rounded-lg text-xs">
+          <option value="vwce">VWCE (Vanguard FTSE All-World UCITS ETF)</option>
+          <option value="sxr8">SXR8 (iShares Core S&P 500 UCITS ETF)</option>
+          <option value="sgln">SGLN (iShares Physical Gold ETC)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-slate-400 mb-1 font-medium">Dodatno kupljeni kosi (+):</label>
+        <input type="number" step="0.0001" id="modal-add-qty" placeholder="npr. 1.5" class="w-full custom-input px-3 py-2 rounded-lg text-xs" />
+      </div>
+
+      <div>
+        <label class="block text-slate-400 mb-1 font-medium">Trenutna / Nova cena (€):</label>
+        <input type="number" step="0.01" id="modal-new-price" placeholder="Pusti prazno za ohranitev trenutne cene" class="w-full custom-input px-3 py-2 rounded-lg text-xs" />
+      </div>
+    </div>
+
+    <div class="flex gap-3 pt-3 border-t border-slate-700">
+      <button onclick="applyWeeklyBuy()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-lg text-xs transition">
+        Potrdi in Dodaj
+      </button>
+      <button onclick="closeWeeklyBuyModal()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium px-4 py-2 rounded-lg text-xs transition">
+        Prekliči
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 1. AŽURNI PRIVZETI PODATKI ZA SLOVENSKE NALOŽBE (LJSE)
+  const SLO_ACCURATE_DEFAULTS = {
+    krkg: { name: 'Krka (KRKG)', qty: 45, price: 258.00 },
+    petg: { name: 'Petrol (PETG)', qty: 247, price: 60.80 },
+    nlbr: { name: 'NLB (NLBR)', qty: 28, price: 228.00 },
+    lkpg: { name: 'Luka Koper (LKPG)', qty: 20, price: 118.00 },
+    zvtg: { name: 'Triglav (ZVTG)', qty: 209, price: 67.00 },
+    rs96: { name: 'Obveznica RS96', qty: 12, price: 1000.00 },
+    rs99: { name: 'Obveznica RS99', qty: 13, price: 1000.00 }
+  };
+
+  // 2. PRIVZETI PODATKI ZA T212 (ROČNI NAČIN SE UPORABI ČE NI API-JA)
+  const ETF_HARDCODED_DEFAULTS = {
+    vwce: { name: 'Vanguard FTSE All-World (VWCE)', source: 'Trading 212', qty: 120, price: 124.50 },
+    sxr8: { name: 'iShares S&P 500 (SXR8)', source: 'Trading 212', qty: 25, price: 512.30 },
+    sgln: { name: 'iShares Physical Gold (SGLN)', source: 'Trading 212', qty: 150, price: 42.80 }
+  };
+
+  let chartInstance = null;
+  let cachedT212Positions = [];
+  let allCombinedPositions = [];
+  let isApiModeEnabled = false;
+  
+  // Časovnik za 15-minutno osveževanje
+  const REFRESH_INTERVAL_SECONDS = 15 * 60; // 900 sekund
+  let secondsUntilRefresh = REFRESH_INTERVAL_SECONDS;
+  let countdownTimerInterval = null;
+
+  function getInputValue(id, fallback) {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    const val = parseFloat(el.value);
+    return isNaN(val) ? fallback : val;
+  }
+
+  function getEtfPositionsFromInputs() {
+    const keys = ['vwce', 'sxr8', 'sgln'];
+    const positions = [];
+
+    keys.forEach(k => {
+      const qty = getInputValue(`qty-${k}`, ETF_HARDCODED_DEFAULTS[k].qty);
+      const price = getInputValue(`price-${k}`, ETF_HARDCODED_DEFAULTS[k].price);
+      
+      positions.push({
+        name: ETF_HARDCODED_DEFAULTS[k].name,
+        source: 'Trading 212',
+        qty: qty,
+        price: price,
+        total: qty * price
+      });
+    });
+
+    return positions;
+  }
+
+  function handleEtfInputChange() {
+    saveEtfDataToStorage();
+    renderUI(getEtfPositionsFromInputs(), getSloPositions());
+  }
+
+  function saveEtfDataToStorage() {
+    const keys = ['vwce', 'sxr8', 'sgln'];
+    const saveData = {};
+    keys.forEach(k => {
+      saveData[k] = {
+        qty: getInputValue(`qty-${k}`, ETF_HARDCODED_DEFAULTS[k].qty),
+        price: getInputValue(`price-${k}`, ETF_HARDCODED_DEFAULTS[k].price)
+      };
+    });
+    localStorage.setItem('etf_portfolio_saved_v5', JSON.stringify(saveData));
+  }
+
+  function restoreEtfDataFromStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('etf_portfolio_saved_v5'));
+      if (saved) {
+        Object.keys(saved).forEach(k => {
+          const qtyEl = document.getElementById(`qty-${k}`);
+          const priceEl = document.getElementById(`price-${k}`);
+          if (qtyEl && saved[k].qty !== undefined) qtyEl.value = saved[k].qty;
+          if (priceEl && saved[k].price !== undefined) priceEl.value = saved[k].price;
         });
-      }, 400);
+      }
+    } catch(e) {
+      console.warn("Napaka pri branju ETF podatkov:", e);
+    }
+  }
 
-      document.getElementById('last-update').textContent = `Zadnja osvežitev: ${new Date().toLocaleTimeString('sl-SI')}`;
+  function getSloPositions() {
+    const keys = ['krkg', 'petg', 'nlbr', 'lkpg', 'zvtg', 'rs96', 'rs99'];
+    const positions = [];
+
+    keys.forEach(k => {
+      const qty = getInputValue(`qty-${k}`, SLO_ACCURATE_DEFAULTS[k].qty);
+      const price = getInputValue(`price-${k}`, SLO_ACCURATE_DEFAULTS[k].price);
+      
+      if (qty > 0) {
+        positions.push({
+          name: SLO_ACCURATE_DEFAULTS[k].name,
+          source: 'NLB Trading',
+          qty: qty,
+          price: price,
+          total: qty * price
+        });
+      }
+    });
+
+    return positions;
+  }
+
+  function handleLocalInputChange() {
+    saveSloDataToStorage();
+    renderUI(getEtfPositionsFromInputs(), getSloPositions());
+  }
+
+  function saveSloDataToStorage() {
+    const keys = ['krkg', 'petg', 'nlbr', 'lkpg', 'zvtg', 'rs96', 'rs99'];
+    const saveData = {};
+    keys.forEach(k => {
+      saveData[k] = {
+        qty: getInputValue(`qty-${k}`, SLO_ACCURATE_DEFAULTS[k].qty),
+        price: getInputValue(`price-${k}`, SLO_ACCURATE_DEFAULTS[k].price)
+      };
+    });
+    localStorage.setItem('slo_portfolio_saved_v5', JSON.stringify(saveData));
+  }
+
+  function restoreSloDataFromStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('slo_portfolio_saved_v5'));
+      if (saved) {
+        Object.keys(saved).forEach(k => {
+          const qtyEl = document.getElementById(`qty-${k}`);
+          const priceEl = document.getElementById(`price-${k}`);
+          if (qtyEl && saved[k].qty !== undefined) qtyEl.value = saved[k].qty;
+          if (priceEl && saved[k].price !== undefined) priceEl.value = saved[k].price;
+        });
+      }
+    } catch(e) {
+      console.warn("Napaka pri branju LJSE podatkov:", e);
+    }
+  }
+
+  function resetToAccurateDefaults() {
+    localStorage.removeItem('slo_portfolio_saved_v5');
+    Object.keys(SLO_ACCURATE_DEFAULTS).forEach(k => {
+      const qtyEl = document.getElementById(`qty-${k}`);
+      const priceEl = document.getElementById(`price-${k}`);
+      if (qtyEl) qtyEl.value = SLO_ACCURATE_DEFAULTS[k].qty;
+      if (priceEl) priceEl.value = SLO_ACCURATE_DEFAULTS[k].price;
+    });
+    renderAll();
+  }
+
+  function openWeeklyBuyModal() {
+    document.getElementById('weekly-buy-modal').classList.remove('hidden');
+    document.getElementById('modal-add-qty').value = '';
+    document.getElementById('modal-new-price').value = '';
+  }
+
+  function closeWeeklyBuyModal() {
+    document.getElementById('weekly-buy-modal').classList.add('hidden');
+  }
+
+  function applyWeeklyBuy() {
+    const etfKey = document.getElementById('modal-etf-select').value;
+    const addQty = parseFloat(document.getElementById('modal-add-qty').value);
+    const newPrice = parseFloat(document.getElementById('modal-new-price').value);
+
+    if (isNaN(addQty) || addQty <= 0) {
+      alert("Prosimo, vnesite veljavno dodatno količino kosov.");
+      return;
     }
 
-    updateAll();
-    setInterval(updateAll, 45000);
-  </script>
+    const qtyEl = document.getElementById(`qty-${etfKey}`);
+    const priceEl = document.getElementById(`price-${etfKey}`);
+
+    if (qtyEl) {
+      const currentQty = parseFloat(qtyEl.value) || 0;
+      qtyEl.value = (currentQty + addQty).toFixed(4);
+    }
+
+    if (priceEl && !isNaN(newPrice) && newPrice > 0) {
+      priceEl.value = newPrice.toFixed(2);
+    }
+
+    saveEtfDataToStorage();
+    closeWeeklyBuyModal();
+    renderAll();
+  }
+
+  function toggleApiMode() {
+    const toggle = document.getElementById('api-mode-toggle');
+    isApiModeEnabled = toggle.checked;
+    localStorage.setItem('t212_api_mode_enabled', isApiModeEnabled ? 'true' : 'false');
+    
+    const credsForm = document.getElementById('t212-credentials-form');
+    if (!isApiModeEnabled) {
+      credsForm.classList.add('opacity-50', 'pointer-events-none');
+    } else {
+      credsForm.classList.remove('opacity-50', 'pointer-events-none');
+    }
+
+    renderAll(true);
+  }
+
+  async function fetchT212PositionsSafe() {
+    const statusEl = document.getElementById('t212-status');
+    const modeBadge = document.getElementById('t212-mode-badge');
+
+    if (!isApiModeEnabled) {
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400';
+      statusEl.innerText = 'Način: Ročni vnos količin in cen';
+      modeBadge.innerText = 'ROČNI VNOS';
+      modeBadge.className = 'text-blue-400 bg-blue-950/60 border border-blue-800 text-[10px] px-2 py-0.5 rounded-full font-semibold';
+      return getEtfPositionsFromInputs();
+    }
+
+    modeBadge.innerText = 'API POVEZAN';
+    modeBadge.className = 'text-emerald-400 bg-emerald-950/60 border border-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold';
+
+    let proxy = (localStorage.getItem('t212_proxy') || '').trim();
+    const apiKey = (localStorage.getItem('t212_key') || '').trim();
+
+    if (!proxy || !apiKey) {
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-amber-950/40 border-amber-800 text-amber-300';
+      statusEl.innerText = '⚠️ Vnesite Worker Proxy URL in API ključ';
+      return getEtfPositionsFromInputs();
+    }
+
+    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-blue-950/40 border-blue-800 text-blue-300';
+    statusEl.innerText = '⏳ Pridobivanje podatkov iz Trading 212...';
+
+    // Priprava url posrednika z ?url=
+    let proxyBase = proxy;
+    if (!proxyBase.includes('?url=') && !proxyBase.endsWith('=')) {
+      proxyBase = proxyBase.endsWith('/') ? `${proxyBase}?url=` : `${proxyBase}/?url=`;
+    }
+
+    // Seznam vstopnih točk (uradna v0/equity/portfolio ter rezervna v0/equity/positions)
+    const endpoints = [
+      'https://live.trading212.com/api/v0/equity/portfolio',
+      'https://live.trading212.com/api/v0/equity/positions'
+    ];
+
+    let lastError = null;
+    let data = null;
+
+    for (const ep of endpoints) {
+      const fullUrl = proxyBase + encodeURIComponent(ep);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 9000);
+
+      try {
+        const response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: { 
+            'Authorization': apiKey,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          data = await response.json();
+          break; // Uspeh!
+        } else {
+          lastError = new Error(`Koda statusa ${response.status}`);
+          if (response.status === 401) {
+            // Če je 401, pomeni da je ključ zavrnjen
+            break;
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        lastError = err;
+      }
+    }
+
+    if (!data) {
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-red-950/40 border-red-800 text-red-300';
+      const errMsg = lastError ? lastError.message : 'Povezava ni uspela';
+      
+      if (errMsg.includes('401')) {
+        statusEl.innerText = `🔴 Napaka 401: Preverite, ali je API ključ ustvarjen za REAL (Invest) račun in ima 'Portfolio' dovoljenje.`;
+      } else {
+        statusEl.innerText = `❌ API napaka: Uporabljeni ročni vnosi (${errMsg})`;
+      }
+      return getEtfPositionsFromInputs();
+    }
+
+    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-emerald-950/40 border-emerald-800 text-emerald-300';
+    statusEl.innerText = `🟢 Povezano! Naloženo ${data.length} pozicij z T212`;
+
+    const apiPositions = [];
+    data.forEach(item => {
+      // Očiščenje tickerja
+      let rawTicker = item.ticker || 'Neznano';
+      let cleanTicker = rawTicker.replace(/_EQ$/, '').replace(/_US_EQ$/, '');
+
+      // Posodobitev ročnih vnosnih polj za skladnost
+      let key = null;
+      if (cleanTicker.includes('VWCE')) key = 'vwce';
+      else if (cleanTicker.includes('SXR8')) key = 'sxr8';
+      else if (cleanTicker.includes('SGLN')) key = 'sgln';
+
+      const qty = parseFloat(item.quantity || 0);
+      const price = parseFloat(item.currentPrice || item.averagePrice || 0);
+
+      if (key) {
+        const qtyEl = document.getElementById(`qty-${key}`);
+        const priceEl = document.getElementById(`price-${key}`);
+        if (qtyEl) qtyEl.value = qty;
+        if (priceEl) priceEl.value = price;
+      }
+
+      apiPositions.push({
+        name: cleanTicker,
+        source: 'Trading 212',
+        qty: qty,
+        price: price,
+        total: qty * price
+      });
+    });
+
+    saveEtfDataToStorage();
+    return apiPositions.length > 0 ? apiPositions : getEtfPositionsFromInputs();
+  }
+
+  function saveAndRefresh() {
+    const proxyVal = document.getElementById('proxy-url').value.trim();
+    const keyVal = document.getElementById('api-key').value.trim();
+    localStorage.setItem('t212_proxy', proxyVal);
+    localStorage.setItem('t212_key', keyVal);
+    renderAll(true);
+  }
+
+  async function renderAll(resetCountdown = false) {
+    if (resetCountdown) {
+      secondsUntilRefresh = REFRESH_INTERVAL_SECONDS;
+    }
+
+    const sloPositions = getSloPositions();
+    const etfPositions = await fetchT212PositionsSafe();
+    
+    cachedT212Positions = etfPositions;
+    renderUI(cachedT212Positions, sloPositions);
+  }
+
+  function renderUI(t212Pos, sloPos) {
+    allCombinedPositions = [...t212Pos, ...sloPos];
+
+    let totalVal = 0;
+    let t212Val = 0;
+    let sloVal = 0;
+
+    allCombinedPositions.forEach(p => {
+      totalVal += p.total;
+      if (p.source === 'Trading 212') t212Val += p.total;
+      if (p.source === 'NLB Trading') sloVal += p.total;
+    });
+
+    // Osvežitev metričnih kartic
+    document.getElementById('metric-total').innerText = formatCurrency(totalVal);
+    document.getElementById('metric-t212').innerText = formatCurrency(t212Val);
+    document.getElementById('metric-nlb').innerText = formatCurrency(sloVal);
+
+    // Izračun odstotkov
+    const t212Pct = totalVal > 0 ? ((t212Val / totalVal) * 100).toFixed(1) : '0.0';
+    const ljsePct = totalVal > 0 ? ((sloVal / totalVal) * 100).toFixed(1) : '0.0';
+
+    document.getElementById('metric-t212-share').innerText = `Delež: ${t212Pct}%`;
+    document.getElementById('metric-ljse-share').innerText = `Delež: ${ljsePct}%`;
+    document.getElementById('metric-t212-count').innerText = `${t212Pos.length} pozicij`;
+
+    // Posodobitev vrstice razmerja
+    document.getElementById('bar-t212').style.width = `${t212Pct}%`;
+    document.getElementById('bar-ljse').style.width = `${ljsePct}%`;
+
+    // Časovni žig
+    const now = new Date();
+    document.getElementById('update-timer').innerText = `Zadnja osvežitev: ${now.toLocaleTimeString('sl-SI')}`;
+    document.getElementById('chart-total-label').innerText = `Skupaj: ${formatCurrency(totalVal)}`;
+
+    filterPositionsTable();
+    renderChart(allCombinedPositions);
+  }
+
+  function formatCurrency(val) {
+    return val.toLocaleString('sl-SI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  }
+
+  function filterPositionsTable() {
+    const query = (document.getElementById('table-search')?.value || '').toLowerCase().trim();
+    const tbody = document.getElementById('portfolio-table-body');
+    tbody.innerHTML = '';
+
+    const filtered = allCombinedPositions.filter(p => p.name.toLowerCase().includes(query) || p.source.toLowerCase().includes(query));
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-slate-500">Ni najdenih pozicij.</td></tr>';
+      return;
+    }
+
+    let totalVal = allCombinedPositions.reduce((acc, curr) => acc + curr.total, 0);
+
+    filtered.forEach(pos => {
+      const share = totalVal > 0 ? ((pos.total / totalVal) * 100).toFixed(1) : '0.0';
+      const tr = document.createElement('tr');
+      tr.className = "hover:bg-slate-800/50 transition-colors";
+      
+      const isT212 = pos.source === 'Trading 212';
+      const badgeClass = isT212 ? 'badge-t212' : 'badge-ljse';
+
+      tr.innerHTML = `
+        <td class="py-2.5 px-3 font-semibold text-slate-100">${pos.name}</td>
+        <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-medium ${badgeClass}">${pos.source}</span></td>
+        <td class="py-2.5 px-3 text-right font-mono text-slate-300">${pos.qty.toLocaleString('sl-SI', {maximumFractionDigits: 4})}</td>
+        <td class="py-2.5 px-3 text-right font-mono text-slate-300">${formatCurrency(pos.price)}</td>
+        <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-100">${formatCurrency(pos.total)}</td>
+        <td class="py-2.5 px-3 text-right font-mono text-slate-400 font-medium">${share} %</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderChart(positions) {
+    const ctx = document.getElementById('portfolioChart').getContext('2d');
+    
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    if (positions.length === 0) return;
+
+    const labels = positions.map(p => p.name);
+    const data = positions.map(p => p.total);
+    
+    const colors = [
+      '#3b82f6', '#10b981', '#f59e0b', '#ec4899', 
+      '#8b5cf6', '#06b6d4', '#6366f1', '#f43f5e', 
+      '#a855f7', '#eab308', '#14b8a6', '#64748b'
+    ];
+
+    chartInstance = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: colors.slice(0, positions.length),
+          borderColor: '#1e293b',
+          borderWidth: 2,
+          hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: window.innerWidth < 640 ? 'bottom' : 'right',
+            labels: {
+              color: '#cbd5e1',
+              font: { size: 11 },
+              padding: 10,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            titleColor: '#f8fafc',
+            bodyColor: '#cbd5e1',
+            borderColor: '#334155',
+            borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              label: function(context) {
+                const val = context.raw || 0;
+                return ` ${context.label}: ${val.toLocaleString('sl-SI', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €`;
+              }
+            }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+
+  function startCountdownTimer() {
+    if (countdownTimerInterval) clearInterval(countdownTimerInterval);
+
+    countdownTimerInterval = setInterval(() => {
+      secondsUntilRefresh--;
+
+      if (secondsUntilRefresh <= 0) {
+        secondsUntilRefresh = REFRESH_INTERVAL_SECONDS;
+        renderAll();
+      }
+
+      const mins = Math.floor(secondsUntilRefresh / 60);
+      const secs = secondsUntilRefresh % 60;
+      const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      
+      const timerEl = document.getElementById('next-refresh-timer');
+      if (timerEl) {
+        timerEl.innerText = `Naslednje osveževanje: ${formatted}`;
+      }
+    }, 1000);
+  }
+
+  window.onload = function() {
+    document.getElementById('proxy-url').value = localStorage.getItem('t212_proxy') || '';
+    document.getElementById('api-key').value = localStorage.getItem('t212_key') || '';
+
+    isApiModeEnabled = localStorage.getItem('t212_api_mode_enabled') === 'true';
+    const toggle = document.getElementById('api-mode-toggle');
+    if (toggle) toggle.checked = isApiModeEnabled;
+
+    const credsForm = document.getElementById('t212-credentials-form');
+    if (!isApiModeEnabled && credsForm) {
+      credsForm.classList.add('opacity-50', 'pointer-events-none');
+    }
+
+    restoreEtfDataFromStorage();
+    restoreSloDataFromStorage();
+
+    renderAll();
+    startCountdownTimer();
+  };
+</script>
 </body>
 </html>
