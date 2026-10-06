@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Moj Združen Portfelj Naložb (LJSE & Trading 212)</title>
-  
+
   <!-- Chart.js za grafični prikaz sestave portfelja -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Tailwind CSS za sodoben in odziven temni dizajn -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <style>
     :root {
       --bg-color: #0f172a;
@@ -20,7 +20,6 @@
       --accent-blue: #3b82f6;
       --accent-green: #10b981;
       --accent-amber: #f59e0b;
-      --accent-purple: #8b5cf6;
       --input-bg: #0f172a;
     }
 
@@ -247,7 +246,7 @@
               </div>
 
               <div>
-                <label class="block text-[11px] font-medium text-slate-400 mb-0.5" for="api-key">Trading 212 API Ključ (Live):</label>
+                <label class="block text-[11px] font-medium text-slate-400 mb-0.5" for="api-key">Trading 212 API Ključ:</label>
                 <input type="password" id="api-key" placeholder="Prilepite API ključ" class="w-full custom-input px-2.5 py-1.5 rounded-lg text-xs" />
               </div>
 
@@ -257,8 +256,21 @@
             </div>
 
             <!-- DIAGNOSTIČNI STATUS -->
-            <div id="t212-status" class="p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400">
+            <div id="t212-status" class="p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400 leading-relaxed">
               Način: Ročni vnos količin in cen
+            </div>
+
+            <!-- ANKETA / NAVODILA ZA REŠEVANJE NAPAKE 401 -->
+            <div id="t212-troubleshoot-box" class="hidden p-3 rounded-xl bg-amber-950/30 border border-amber-800/60 text-[11px] text-amber-200 space-y-2">
+              <div class="font-bold flex items-center gap-1.5 text-amber-400">
+                <span>🛠️</span> Navodila za odpravljanje napake 401 Unauthorized:
+              </div>
+              <ul class="list-disc list-inside space-y-1 text-slate-300 text-[10.5px]">
+                <li><strong class="text-amber-300">Tip računa:</strong> Preverite, da uporabljate ključ ustvarjen pod <em>Invest / Stocks</em> in ne CFD.</li>
+                <li><strong class="text-amber-300">Dovoljenja:</strong> Ob ustvarjanju ključa v T212 omogočite dovoljenje <strong>Portfolio (Read)</strong>.</li>
+                <li><strong class="text-amber-300">IP Omejitve:</strong> V nastavitvah API ključa nastavite IP na <code>Unrestricted</code> (ali dodajte IP vašega Cloudflare Workerja).</li>
+                <li><strong class="text-amber-300">Cloudflare Proxy:</strong> Prepričajte se, da vaš Worker posreduje glavo <code>Authorization</code> in URL parameter <code>apiKey</code>.</li>
+              </ul>
             </div>
           </div>
         </details>
@@ -341,7 +353,7 @@
 
         <div class="pt-2">
           <button onclick="resetToAccurateDefaults()" class="w-full bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 py-2 px-3 rounded-lg text-xs font-medium transition duration-150 flex items-center justify-center gap-2">
-            <span>🔄</span> Ponastavi na privzete cene in količine
+            <span>🔄</span> Ponastavi na privzete točne cene in količine
           </button>
         </div>
 
@@ -414,7 +426,7 @@
 
     <div class="space-y-3 text-xs">
       <div>
-        <label class="block text-slate-400 mb-1 font-medium">Izberi ETF za nakup:</label>
+        <label class="block text-slate-400 mb-1 font-medium" for="modal-etf-select">Izberi ETF za nakup:</label>
         <select id="modal-etf-select" class="w-full custom-input px-3 py-2 rounded-lg text-xs">
           <option value="vwce">VWCE (Vanguard FTSE All-World UCITS ETF)</option>
           <option value="sxr8">SXR8 (iShares Core S&P 500 UCITS ETF)</option>
@@ -423,15 +435,18 @@
       </div>
 
       <div>
-        <label class="block text-slate-400 mb-1 font-medium">Dodatno kupljeni kosi (+):</label>
+        <label class="block text-slate-400 mb-1 font-medium" for="modal-add-qty">Dodatno kupljeni kosi (+):</label>
         <input type="number" step="0.0001" id="modal-add-qty" placeholder="npr. 1.5" class="w-full custom-input px-3 py-2 rounded-lg text-xs" />
       </div>
 
       <div>
-        <label class="block text-slate-400 mb-1 font-medium">Trenutna / Nova cena (€):</label>
+        <label class="block text-slate-400 mb-1 font-medium" for="modal-new-price">Trenutna / Nova cena (€):</label>
         <input type="number" step="0.01" id="modal-new-price" placeholder="Pusti prazno za ohranitev trenutne cene" class="w-full custom-input px-3 py-2 rounded-lg text-xs" />
       </div>
     </div>
+
+    <!-- Sporočilo o napaki v modalu namesto alert() -->
+    <div id="modal-error-msg" class="hidden text-red-400 text-xs font-semibold"></div>
 
     <div class="flex gap-3 pt-3 border-t border-slate-700">
       <button onclick="applyWeeklyBuy()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-lg text-xs transition">
@@ -445,7 +460,7 @@
 </div>
 
 <script>
-  // 1. AŽURNI PRIVZETI PODATKI ZA SLOVENSKE NALOŽBE (LJSE)
+  // 1. AŽURNI PRIVZETI PODATKI ZA SLOVENSKE NALOŽBE (LJSE & OBVEZNICE)
   const SLO_ACCURATE_DEFAULTS = {
     krkg: { name: 'Krka (KRKG)', qty: 45, price: 258.00 },
     petg: { name: 'Petrol (PETG)', qty: 247, price: 60.80 },
@@ -456,7 +471,7 @@
     rs99: { name: 'Obveznica RS99', qty: 13, price: 1000.00 }
   };
 
-  // 2. PRIVZETI PODATKI ZA T212 (ROČNI NAČIN SE UPORABI ČE NI API-JA)
+  // 2. PRIVZETI PODATKI ZA T212 (ROČNI NAČIN SE UPORABI ČE NI API-JA ALI OB NAPAKI)
   const ETF_HARDCODED_DEFAULTS = {
     vwce: { name: 'Vanguard FTSE All-World (VWCE)', source: 'Trading 212', qty: 120, price: 124.50 },
     sxr8: { name: 'iShares S&P 500 (SXR8)', source: 'Trading 212', qty: 25, price: 512.30 },
@@ -514,12 +529,12 @@
         price: getInputValue(`price-${k}`, ETF_HARDCODED_DEFAULTS[k].price)
       };
     });
-    localStorage.setItem('etf_portfolio_saved_v5', JSON.stringify(saveData));
+    localStorage.setItem('etf_portfolio_saved_v6', JSON.stringify(saveData));
   }
 
   function restoreEtfDataFromStorage() {
     try {
-      const saved = JSON.parse(localStorage.getItem('etf_portfolio_saved_v5'));
+      const saved = JSON.parse(localStorage.getItem('etf_portfolio_saved_v6'));
       if (saved) {
         Object.keys(saved).forEach(k => {
           const qtyEl = document.getElementById(`qty-${k}`);
@@ -569,12 +584,12 @@
         price: getInputValue(`price-${k}`, SLO_ACCURATE_DEFAULTS[k].price)
       };
     });
-    localStorage.setItem('slo_portfolio_saved_v5', JSON.stringify(saveData));
+    localStorage.setItem('slo_portfolio_saved_v6', JSON.stringify(saveData));
   }
 
   function restoreSloDataFromStorage() {
     try {
-      const saved = JSON.parse(localStorage.getItem('slo_portfolio_saved_v5'));
+      const saved = JSON.parse(localStorage.getItem('slo_portfolio_saved_v6'));
       if (saved) {
         Object.keys(saved).forEach(k => {
           const qtyEl = document.getElementById(`qty-${k}`);
@@ -589,7 +604,7 @@
   }
 
   function resetToAccurateDefaults() {
-    localStorage.removeItem('slo_portfolio_saved_v5');
+    localStorage.removeItem('slo_portfolio_saved_v6');
     Object.keys(SLO_ACCURATE_DEFAULTS).forEach(k => {
       const qtyEl = document.getElementById(`qty-${k}`);
       const priceEl = document.getElementById(`price-${k}`);
@@ -600,6 +615,8 @@
   }
 
   function openWeeklyBuyModal() {
+    const errorMsg = document.getElementById('modal-error-msg');
+    if (errorMsg) errorMsg.classList.add('hidden');
     document.getElementById('weekly-buy-modal').classList.remove('hidden');
     document.getElementById('modal-add-qty').value = '';
     document.getElementById('modal-new-price').value = '';
@@ -610,12 +627,16 @@
   }
 
   function applyWeeklyBuy() {
+    const errorMsg = document.getElementById('modal-error-msg');
     const etfKey = document.getElementById('modal-etf-select').value;
     const addQty = parseFloat(document.getElementById('modal-add-qty').value);
     const newPrice = parseFloat(document.getElementById('modal-new-price').value);
 
     if (isNaN(addQty) || addQty <= 0) {
-      alert("Prosimo, vnesite veljavno dodatno količino kosov.");
+      if (errorMsg) {
+        errorMsg.innerText = "Prosimo, vnesite veljavno dodatno količino kosov.";
+        errorMsg.classList.remove('hidden');
+      }
       return;
     }
 
@@ -654,9 +675,12 @@
   async function fetchT212PositionsSafe() {
     const statusEl = document.getElementById('t212-status');
     const modeBadge = document.getElementById('t212-mode-badge');
+    const troubleshootBox = document.getElementById('t212-troubleshoot-box');
+
+    if (troubleshootBox) troubleshootBox.classList.add('hidden');
 
     if (!isApiModeEnabled) {
-      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400';
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-slate-950 border-slate-800 text-slate-400 leading-relaxed';
       statusEl.innerText = 'Način: Ročni vnos količin in cen';
       modeBadge.innerText = 'ROČNI VNOS';
       modeBadge.className = 'text-blue-400 bg-blue-950/60 border border-blue-800 text-[10px] px-2 py-0.5 rounded-full font-semibold';
@@ -670,33 +694,40 @@
     const apiKey = (localStorage.getItem('t212_key') || '').trim();
 
     if (!proxy || !apiKey) {
-      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-amber-950/40 border-amber-800 text-amber-300';
-      statusEl.innerText = '⚠️ Vnesite Worker Proxy URL in API ključ';
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-amber-950/40 border-amber-800 text-amber-300 leading-relaxed';
+      statusEl.innerText = '⚠️️ Vnesite Worker Proxy URL in API ključ';
       return getEtfPositionsFromInputs();
     }
 
-    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-blue-950/40 border-blue-800 text-blue-300';
-    statusEl.innerText = '⏳ Pridobivanje podatkov iz Trading 212...';
+    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-blue-950/40 border-blue-800 text-blue-300 leading-relaxed';
+    statusEl.innerText = '⏳ Preizkušanje vseh vstopnih točk (LIVE in DEMO)...';
 
-    // Priprava url posrednika z ?url=
+    // Priprava osnovnega proxy URL-ja
     let proxyBase = proxy;
     if (!proxyBase.includes('?url=') && !proxyBase.endsWith('=')) {
       proxyBase = proxyBase.endsWith('/') ? `${proxyBase}?url=` : `${proxyBase}/?url=`;
     }
 
-    // Seznam vstopnih točk (uradna v0/equity/portfolio ter rezervna v0/equity/positions)
+    // Seznam vseh vstopnih točk (LIVE in DEMO strežnika za portfolio ter positions)
     const endpoints = [
       'https://live.trading212.com/api/v0/equity/portfolio',
-      'https://live.trading212.com/api/v0/equity/positions'
+      'https://live.trading212.com/api/v0/equity/positions',
+      'https://demo.trading212.com/api/v0/equity/portfolio',
+      'https://demo.trading212.com/api/v0/equity/positions'
     ];
 
     let lastError = null;
     let data = null;
+    let successfulEndpoint = '';
+    let had401Error = false;
 
     for (const ep of endpoints) {
-      const fullUrl = proxyBase + encodeURIComponent(ep);
+      // Posredovanje API ključa tudi prek varnih URL parametrov ('apiKey') poleg glave
+      const targetUrlWithKey = `${ep}${ep.includes('?') ? '&' : '?'}apiKey=${encodeURIComponent(apiKey)}`;
+      const fullUrl = proxyBase + encodeURIComponent(targetUrlWithKey);
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 9000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       try {
         const response = await fetch(fullUrl, {
@@ -711,13 +742,13 @@
 
         if (response.ok) {
           data = await response.json();
-          break; // Uspeh!
+          successfulEndpoint = ep.includes('demo') ? 'DEMO' : 'LIVE';
+          break; // Uspeh! Stopimo iz zanke
         } else {
-          lastError = new Error(`Koda statusa ${response.status}`);
           if (response.status === 401) {
-            // Če je 401, pomeni da je ključ zavrnjen
-            break;
+            had401Error = true;
           }
+          lastError = new Error(`HTTP ${response.status} na ${ep.includes('demo') ? 'DEMO' : 'LIVE'}`);
         }
       } catch (err) {
         clearTimeout(timeoutId);
@@ -726,33 +757,32 @@
     }
 
     if (!data) {
-      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-red-950/40 border-red-800 text-red-300';
-      const errMsg = lastError ? lastError.message : 'Povezava ni uspela';
+      statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-red-950/40 border-red-800 text-red-300 leading-relaxed';
       
-      if (errMsg.includes('401')) {
-        statusEl.innerText = `🔴 Napaka 401: Preverite, ali je API ključ ustvarjen za REAL (Invest) račun in ima 'Portfolio' dovoljenje.`;
+      if (had401Error) {
+        statusEl.innerText = `🔴 Napaka 401 (Unauthorized) na vseh vstopnih točkah. Uporabljeni ročni podatki.`;
+        if (troubleshootBox) troubleshootBox.classList.remove('hidden');
       } else {
+        const errMsg = lastError ? lastError.message : 'Povezava ni uspela';
         statusEl.innerText = `❌ API napaka: Uporabljeni ročni vnosi (${errMsg})`;
       }
       return getEtfPositionsFromInputs();
     }
 
-    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-emerald-950/40 border-emerald-800 text-emerald-300';
-    statusEl.innerText = `🟢 Povezano! Naloženo ${data.length} pozicij z T212`;
+    statusEl.className = 'p-2.5 rounded-lg text-[11px] border text-center font-medium bg-emerald-950/40 border-emerald-800 text-emerald-300 leading-relaxed';
+    statusEl.innerText = `🟢 Povezano (${successfulEndpoint})! Naloženo ${data.length} pozicij z T212`;
 
     const apiPositions = [];
     data.forEach(item => {
-      // Očiščenje tickerja
       let rawTicker = item.ticker || 'Neznano';
       let cleanTicker = rawTicker.replace(/_EQ$/, '').replace(/_US_EQ$/, '');
 
-      // Posodobitev ročnih vnosnih polj za skladnost
       let key = null;
       if (cleanTicker.includes('VWCE')) key = 'vwce';
       else if (cleanTicker.includes('SXR8')) key = 'sxr8';
       else if (cleanTicker.includes('SGLN')) key = 'sgln';
 
-      const qty = parseFloat(item.quantity || 0);
+      const qty = parseFloat(item.quantity || item.initialQuantity || 0);
       const price = parseFloat(item.currentPrice || item.averagePrice || 0);
 
       if (key) {
